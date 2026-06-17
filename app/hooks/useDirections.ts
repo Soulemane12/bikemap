@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 
 export interface Step {
-  maneuver: { instruction: string };
+  maneuver: { instruction: string; location: [number, number]; bearing_after: number };
   distance: number;
   duration: number;
 }
@@ -27,7 +27,7 @@ export function useDirections() {
       setError(null);
       const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
       const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
-      const url = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coords}?geometries=geojson&steps=true&access_token=${token}`;
+      const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${coords}?geometries=geojson&steps=true&access_token=${token}`;
 
       try {
         const res = await fetch(url);
@@ -39,8 +39,15 @@ export function useDirections() {
           return;
         }
         const r: RouteResult = data.routes[0];
+        // 14 mph average bike speed = 6.26 m/s
+        r.duration = r.distance / 6.26;
         setRoute(r);
-        setSteps(r.legs.flatMap((leg) => leg.steps));
+        const allSteps = r.legs.flatMap((leg) => leg.steps);
+        // Replace "Walk" with "Ride" in instructions
+        allSteps.forEach((s) => {
+          s.maneuver.instruction = s.maneuver.instruction.replace(/^Walk\b/, "Ride");
+        });
+        setSteps(allSteps);
       } catch {
         setError("Failed to fetch route.");
       } finally {
